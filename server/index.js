@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const messageRoutes = require('./routes/messageRoutes');
+const invitationRoutes = require('./routes/invitationRoutes');
 const User = require('./models/User');
 const Message = require('./models/Message');
 
@@ -15,7 +16,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: '*',
     methods: ['GET', 'POST'],
   }
 });
@@ -26,10 +27,17 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/invitations', invitationRoutes);
+app.set('io', io);
 
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
 
+ // Invitation subscription
+ socket.on('subscribe-invitations', (email) => {
+  socket.join(email);
+  console.log(`User ${email} subscribed to invitation updates`);
+});
   // Get user statuses
   socket.on('get-user-statuses', async (usernames) => {
     try {
