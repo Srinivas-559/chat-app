@@ -1,77 +1,75 @@
-import React, { useEffect, useState } from 'react';
-import io from 'socket.io-client';
-
-// Create socket connection outside the component to prevent multiple connections
-let socket;
-if (!socket) {
-  socket = io('http://localhost:5001');
-}
+import React, { useEffect, useState , useRef } from 'react';
+import { getSocket } from '../socket'; // Import centralized socket
 
 const PreviousChats = ({ chats, onSelect }) => {
     const [chatUsers, setChatUsers] = useState({});
     const [sortedChats, setSortedChats] = useState([]);
     const currentUser = JSON.parse(localStorage.getItem('user'))?.name;
+    const socketRef = useRef(null);
 
+    // Initialize socket and status listeners
     useEffect(() => {
-        // Sort chats by timestamp
-        setSortedChats([...chats].sort((a, b) =>
-            new Date(b.timestamp || b.createdAt) - new Date(a.timestamp || a.createdAt)
-        ));
-        
-        // Extract unique usernames from chats
-        if (chats.length > 0) {
-            const uniqueUsers = new Set();
-            chats.forEach(msg => {
-                const otherUser = msg.from === currentUser ? msg.to : msg.from;
-                uniqueUsers.add(otherUser);
-            });
-            
-            // Request status for all users we're chatting with
-            if (uniqueUsers.size > 0) {
-                socket.emit('get-all-statuses', Array.from(uniqueUsers));
-            }
+        socketRef.current = getSocket();
+        const socket = socketRef.current;
+
+        // Register current user
+        if (currentUser) {
+            socket.emit('register', currentUser);
         }
-    }, [chats, currentUser]);
 
-    useEffect(() => {
-        if (!currentUser) return;
-        
-        // Register the current user when component mounts
-        socket.emit('register', currentUser);
-        
         // Listen for user status updates
         const handleUserStatus = ({ name, isOnline }) => {
-            console.log('User status update:', name, isOnline);
             setChatUsers(prev => ({
                 ...prev,
                 [name]: isOnline
             }));
         };
-        
+
         // Listen for bulk status updates
         const handleAllStatuses = (statuses) => {
-            console.log('All statuses received:', statuses);
             setChatUsers(prev => ({
                 ...prev,
                 ...statuses
             }));
         };
-        
+
         socket.on('user-status', handleUserStatus);
         socket.on('all-statuses', handleAllStatuses);
-        
+
         return () => {
             socket.off('user-status', handleUserStatus);
             socket.off('all-statuses', handleAllStatuses);
         };
     }, [currentUser]);
 
+    // Sort chats and update statuses
+    useEffect(() => {
+        // Sort chats by timestamp
+        const sorted = [...chats].sort((a, b) =>
+            new Date(b.timestamp || b.createdAt) - new Date(a.timestamp || a.createdAt)
+        );
+        setSortedChats(sorted);
+
+        // Extract unique users
+        const uniqueUsers = new Set();
+        sorted.forEach(msg => {
+            const otherUser = msg.from === currentUser ? msg.to : msg.from;
+            uniqueUsers.add(otherUser);
+        });
+
+        // Request statuses for all unique users
+        if (uniqueUsers.size > 0 && currentUser) {
+            socketRef.current.emit('get-all-statuses', Array.from(uniqueUsers));
+        }
+    }, [chats, currentUser]);
+
     const getOtherUser = (msg) => {
         return msg.from === currentUser ? msg.to : msg.from;
     };
 
     const getUserStatus = (username) => {
-        return !!chatUsers[username]; // Convert to boolean
+        // Return undefined if status not loaded yet
+        return chatUsers[username];
     };
 
     return (
@@ -86,7 +84,7 @@ const PreviousChats = ({ chats, onSelect }) => {
 
                     return (
                         <div
-                            key={`${otherUser}-${index}`}
+                            key={`${otherUser}-${msg._id}-${index}`}
                             className="bg-white p-3 rounded shadow mb-2 cursor-pointer hover:bg-gray-50 relative"
                             onClick={() => onSelect(otherUser)}
                         >
@@ -94,8 +92,11 @@ const PreviousChats = ({ chats, onSelect }) => {
                                 <div className="font-medium flex items-center gap-2">
                                     <span
                                         className={`w-2 h-2 rounded-full ${
+                                            isOnline === undefined ? 'bg-gray-400' : 
                                             isOnline ? 'bg-green-500' : 'bg-red-500'
                                         }`}
+                                        title={isOnline === undefined ? 'Status loading...' : 
+                                               isOnline ? 'Online' : 'Offline'}
                                     ></span>
                                     {otherUser}
                                 </div>

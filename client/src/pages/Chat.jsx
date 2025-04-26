@@ -1,17 +1,15 @@
-// pages/Chat.jsx
 import React, { useEffect, useState } from 'react';
-import io from 'socket.io-client';
 import axios from 'axios';
+import { getSocket, disconnectSocket } from '../socket';
 import ChatScreen from '../components/ChatScreen';
 import PreviousChats from '../components/PreviousChats';
 import AddChat from '../components/AddChat';
 
 function Chat() {
-  const [socket, setSocket] = useState(null);
   const [user, setUser] = useState(null);
-  const [fullName, setFullName] = useState('');
   const [usernameInput, setUsernameInput] = useState('');
   const [selectedUser, setSelectedUser] = useState(null);
+  const [fullName, setFullName] = useState('');
   const [previousChats, setPreviousChats] = useState([]);
 
   // Load saved user and initialize socket
@@ -20,47 +18,46 @@ function Chat() {
     if (savedUser) {
       const userObj = JSON.parse(savedUser);
       setUser(userObj);
-      const newSocket = io('http://localhost:5001');
-      newSocket.emit('register', userObj.name);
-      setSocket(newSocket);
+      
+      // Initialize socket connection
+      const socket = getSocket();
+      socket.emit('register', userObj.name);
     }
+
+    return () => {
+      // Don't disconnect here - let individual components manage their listeners
+    };
   }, []);
 
   // Fetch previous chats
   useEffect(() => {
     if (user) {
-      axios
-        .get(`http://localhost:5001/api/messages/latest-chats?name=${user.name}`)
+      axios.get(`http://localhost:5001/api/messages/latest-chats?name=${user.name}`)
         .then((res) => {
           setPreviousChats(res.data);
         })
-        .catch((err) => {
-          console.error('Error fetching previous chats:', err);
-        });
+        .catch(console.error);
     }
   }, [user]);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!usernameInput.trim()) return;
 
-    axios
-      .post('http://localhost:5001/api/auth/login', { name: usernameInput })
-      .then((res) => {
-        const newSocket = io('http://localhost:5001');
-        newSocket.emit('register', res.data.name);
-        setSocket(newSocket);
+    try {
+      const res = await axios.post('http://localhost:5001/api/auth/login', { name: usernameInput });
+      const socket = getSocket();
+      socket.emit('register', res.data.name);
 
-        setUser(res.data);
-        localStorage.setItem('user', JSON.stringify(res.data));
-        setUsernameInput('');
-      });
+      setUser(res.data);
+      localStorage.setItem('user', JSON.stringify(res.data));
+      setUsernameInput('');
+    } catch (err) {
+      console.error('Login error:', err);
+    }
   };
 
   const handleLogout = () => {
-    if (socket) {
-      socket.disconnect();
-      setSocket(null);
-    }
+    disconnectSocket();
     setUser(null);
     setSelectedUser(null);
     setPreviousChats([]);
@@ -78,7 +75,7 @@ function Chat() {
 
   return (
     <div className="max-w-md mx-auto p-4 bg-gray-100 h-screen overflow-y-auto">
-      {/* Top Login Bar */}
+      {/* Login/Logout bar */}
       <div className="flex items-center justify-between mb-4">
         {user ? (
           <>
@@ -121,7 +118,6 @@ function Chat() {
             currentUser={user.name}
             targetUser={selectedUser}
             targetUserName={fullName}
-            socket={socket}
             onBack={handleBack}
           />
         )

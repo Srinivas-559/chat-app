@@ -1,4 +1,21 @@
-// src/socket.js
 import { io } from 'socket.io-client';
-const socket = io('http://localhost:5001');
-export default socket;
+
+let socketInstance = null;
+
+export const getSocket = () => {
+  if (!socketInstance) {
+    socketInstance = io('http://localhost:5001', {
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+  }
+  return socketInstance;
+};
+
+export const disconnectSocket = () => {
+  if (socketInstance) {
+    socketInstance.disconnect();
+    socketInstance = null;
+  }
+};

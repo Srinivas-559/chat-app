@@ -34,8 +34,12 @@ const AddChat = ({ currentUser, onStartChat }) => {
         console.error('Failed to fetch users:', err);
         // Fallback to dummy data if API fails
         const dummyFamilyMembers = [
-          { email: 'dummy1@example.com', fullName: 'Family Member 1', relation: 'Father', profileImage: '' },
-          { email: 'dummy2@example.com', fullName: 'Family Member 2', relation: 'Mother', profileImage: '' }
+          { email: 'a@example.com', fullName: 'Family Member a', relation: 'Father', profileImage: '' },
+          { email: 'b@example.com', fullName: 'Family Member b', relation: 'Father', profileImage: '' },
+          { email: 'c@example.com', fullName: 'Family Member c', relation: 'Father', profileImage: '' },
+          { email: 'd@example.com', fullName: 'Family Member d', relation: 'Father', profileImage: '' },
+          { email: 'e@example.com', fullName: 'Family Member e', relation: 'Father', profileImage: '' },
+          { email: 'f@example.com', fullName: 'Family Member f', relation: 'Mother', profileImage: '' }
         ];
         setFamilyMembers(dummyFamilyMembers);
       });

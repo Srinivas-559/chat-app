@@ -1,8 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import axios from 'axios';
-import io from 'socket.io-client';
-
-const socket = io('http://localhost:5001');
+import { getSocket } from '../socket';
 
 const ChatScreen = ({ currentUser, targetUser, targetUserName, onBack }) => {
   const [messages, setMessages] = useState([]);
@@ -11,24 +9,72 @@ const ChatScreen = ({ currentUser, targetUser, targetUserName, onBack }) => {
   const [isUserOnline, setIsUserOnline] = useState(false);
   const messagesEndRef = useRef();
   const typingTimeoutRef = useRef(null);
+  const socketRef = useRef(null);
 
-  // Message handler with deduplication
+  // Initialize socket and listeners
+  useEffect(() => {
+    socketRef.current = getSocket();
+    const socket = socketRef.current;
+
+    // Register current user
+    socket.emit('register', currentUser);
+
+    // Get initial online status
+    socket.emit('get-user-status', targetUser);
+
+    // Fetch initial messages
+    const fetchMessages = async () => {
+      try {
+        const res = await axios.get(
+          `http://localhost:5001/api/messages?from=${currentUser}&to=${targetUser}`
+        );
+        const data = Array.isArray(res.data) ? res.data : res.data.messages || [];
+        
+        setMessages(data.map(msg => ({
+          ...msg,
+          read: msg.from === currentUser ? true : msg.read
+        })));
+        
+        // Mark messages as read when opening chat
+        socket.emit('mark-read', { from: currentUser, to: targetUser });
+      } catch (err) {
+        console.error('Failed to fetch messages:', err);
+        setMessages([]);
+      }
+    };
+
+    fetchMessages();
+
+    return () => {
+      // Clean up typing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, [currentUser, targetUser]);
+
+  // Message handler with robust deduplication
   const handleIncomingMessage = useCallback((msg) => {
     setMessages(prev => {
-      // Check if message already exists
-      const exists = prev.some(m => m._id === msg._id);
+      // Check if message already exists using multiple criteria
+      const exists = prev.some(m => 
+        m._id === msg._id || 
+        (m.text === msg.text && 
+         m.from === msg.from && 
+         Math.abs(new Date(m.createdAt) - new Date(msg.createdAt)) < 1000)
+      );
+      
       if (exists) return prev;
       
       return [...prev, {
         ...msg,
-        // Mark as read if it's our own message
         read: msg.from === currentUser ? true : msg.read
       }];
     });
 
     // If message is from the other user, mark as read
     if (msg.from === targetUser) {
-      socket.emit('mark-read', { from: currentUser, to: targetUser });
+      socketRef.current.emit('mark-read', { from: currentUser, to: targetUser });
     }
   }, [currentUser, targetUser]);
 
@@ -42,33 +88,11 @@ const ChatScreen = ({ currentUser, targetUser, targetUserName, onBack }) => {
     }));
   }, []);
 
+  // Setup socket listeners
   useEffect(() => {
-    // Fetch initial messages
-    axios.get(`http://localhost:5001/api/messages?from=${currentUser}&to=${targetUser}`)
-      .then(res => {
-        const data = Array.isArray(res.data) ? res.data : res.data.messages || [];
-        setMessages(data.map(msg => ({
-          ...msg,
-          read: msg.from === currentUser ? true : msg.read
-        })));
-        
-        // Mark messages as read when opening chat
-        socket.emit('mark-read', { from: currentUser, to: targetUser });
-      })
-      .catch(err => {
-        console.error('Failed to fetch messages:', err);
-        setMessages([]);
-      });
+    const socket = socketRef.current;
+    if (!socket) return;
 
-    // Get initial online status
-    socket.emit('get-user-status', targetUser);
-  }, [currentUser, targetUser]);
-
-  useEffect(() => {
-    // Register current user
-    socket.emit('register', currentUser);
-
-    // Socket event listeners
     socket.on('private-message', handleIncomingMessage);
     socket.on('messages-read', handleMessagesRead);
     
@@ -97,47 +121,41 @@ const ChatScreen = ({ currentUser, targetUser, targetUserName, onBack }) => {
       socket.off('messages-read', handleMessagesRead);
       socket.off('typing', handleTyping);
       socket.off('user-status', handleStatusUpdate);
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
-  }, [currentUser, targetUser, handleIncomingMessage, handleMessagesRead]);
+  }, [targetUser, handleIncomingMessage, handleMessagesRead]);
 
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const sendMessage = async () => {
+  const sendMessage = () => {
     if (!text.trim()) return;
     
-    try {
-      const messageText = text;
-      setText(''); // Clear input immediately
-      
-      // Optimistic update
-      const tempId = Date.now().toString();
-      setMessages(prev => [...prev, {
-        _id: tempId,
-        from: currentUser,
-        to: targetUser,
-        text: messageText,
-        read: false,
-        createdAt: new Date()
-      }]);
+    const messageText = text;
+    setText('');
+    
+    // Optimistic update
+    const tempId = Date.now().toString();
+    setMessages(prev => [...prev, {
+      _id: tempId,
+      from: currentUser,
+      to: targetUser,
+      text: messageText,
+      read: false,
+      createdAt: new Date()
+    }]);
 
-      // Send via socket
-      socket.emit('private-message', {
-        from: currentUser,
-        to: targetUser,
-        text: messageText
-      });
-    } catch (err) {
-      console.error('Send message error:', err);
-      // Restore text if failed
-      setText(messageText);
-    }
+    // Send via socket
+    socketRef.current.emit('private-message', {
+      from: currentUser,
+      to: targetUser,
+      text: messageText
+    });
   };
 
   const handleTypingInput = () => {
-    socket.emit('typing', { from: currentUser, to: targetUser });
+    socketRef.current.emit('typing', { from: currentUser, to: targetUser });
   };
 
   const renderMessageStatus = (msg) => {
@@ -146,9 +164,9 @@ const ChatScreen = ({ currentUser, targetUser, targetUserName, onBack }) => {
     return (
       <span className="ml-1">
         {msg.read ? (
-          <span className="text-blue-500">✓✓</span> // Double tick for read
+          <span className="text-blue-500">✓✓</span>
         ) : (
-          <span className="text-gray-400">✓</span> // Single tick for sent
+          <span className="text-gray-400">✓</span>
         )}
       </span>
     );
@@ -156,6 +174,7 @@ const ChatScreen = ({ currentUser, targetUser, targetUserName, onBack }) => {
 
   return (
     <div className="bg-white h-full p-4 rounded shadow flex flex-col">
+      {/* Header with back button and user info */}
       <div className="flex justify-between items-center mb-2">
         <button className="text-sm text-blue-500" onClick={onBack}>← Back</button>
         <div className="flex items-center gap-2">
@@ -168,16 +187,18 @@ const ChatScreen = ({ currentUser, targetUser, targetUserName, onBack }) => {
         </div>
       </div>
 
+      {/* Typing indicator */}
       {isTyping && (
         <div className="text-sm text-gray-500 italic mb-2">
           {targetUserName} is typing...
         </div>
       )}
 
+      {/* Messages container */}
       <div className="flex-1 overflow-y-auto mb-2">
         {messages.map((msg) => (
           <div
-            key={msg._id || msg.createdAt} // Fallback to timestamp if no ID
+            key={msg._id || msg.createdAt}
             className={`mb-2 ${msg.from === currentUser ? 'text-right' : 'text-left'}`}
           >
             <div
@@ -199,6 +220,7 @@ const ChatScreen = ({ currentUser, targetUser, targetUserName, onBack }) => {
         <div ref={messagesEndRef}></div>
       </div>
 
+      {/* Message input */}
       <div className="flex gap-2">
         <input
           className="flex-1 p-2 border rounded"
