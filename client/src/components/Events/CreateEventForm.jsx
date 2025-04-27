@@ -42,8 +42,7 @@ export default function CreateEventForm({ user }) {
             const data = await res.json();
             
             if (res.ok) {
-                alert('Event created successfully with participants!');
-                // Reset form
+            console.log("event created !")// Reset form
                 setEventName('');
                 setEventDate('');
                 setLocation('');

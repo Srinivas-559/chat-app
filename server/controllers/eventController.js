@@ -74,22 +74,22 @@ exports.createEvent = async (req, res) => {
 };
 
 // Join Event
-exports.joinEvent = async (req, res) => {
-  try {
-    const { eventId, email } = req.body;
+// exports.joinEvent = async (req, res) => {
+//   try {
+//     const { eventId, email } = req.body;
 
-    const existing = await EventUser.findOne({ eventId, email });
-    if (existing) {
-      return res.status(400).json({ message: 'Already joined this event' });
-    }
+//     const existing = await EventUser.findOne({ eventId, email });
+//     if (existing) {
+//       return res.status(400).json({ message: 'Already joined this event' });
+//     }
 
-    const participation = new EventUser({ eventId, email });
-    await participation.save();
-    res.status(201).json({ message: 'Joined event successfully', participation });
-  } catch (error) {
-    res.status(500).json({ message: 'Error joining event', error });
-  }
-};
+//     const participation = new EventUser({ eventId, email });
+//     await participation.save();
+//     res.status(201).json({ message: 'Joined event successfully', participation });
+//   } catch (error) {
+//     res.status(500).json({ message: 'Error joining event', error });
+//   }
+// };
 
 // Get Participated Events
 exports.getParticipatedEvents = async (req, res) => {
