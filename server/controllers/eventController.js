@@ -4,7 +4,17 @@ const EventUser = require('../models/EventUser');
 // Create Event with Participants
 exports.createEvent = async (req, res) => {
     try {
-        const { name, date, location, description, organizerEmail, participants = [] } = req.body;
+        const { 
+            name, 
+            date, 
+            location, 
+            description, 
+            organizerEmail, 
+            participants = [], 
+            photos = [], 
+            messagingUrl = '', 
+            rsvpDeadline 
+        } = req.body;
         
         // Validate required fields
         if (!name || !date || !organizerEmail) {
@@ -19,13 +29,19 @@ exports.createEvent = async (req, res) => {
             date: new Date(date),
             location, 
             description, 
-            organizerEmail 
+            organizerEmail,
+            photos, // base64 encoded images array
+            messagingUrl, // messaging URL
+            rsvpDeadline: rsvpDeadline ? new Date(rsvpDeadline) : undefined, // optional, fallback to schema default
         });
 
         await event.save();
 
         const io = req.app.get('io');
-        const allParticipants = [...participants, { email: organizerEmail, username: req.user?.username || 'Organizer' }];
+        const allParticipants = [
+            ...participants, 
+            { email: organizerEmail, username: req.user?.username || 'Organizer' }
+        ];
 
         // Add all participants (including organizer) directly as joined
         const participantPromises = allParticipants.map(participant => 

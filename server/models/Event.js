@@ -5,8 +5,11 @@ const eventSchema = new mongoose.Schema({
   date: { type: Date, required: true },
   location: { type: String },
   description: { type: String },
-  organizerEmail: { type: String, required: true, index: true }, // added organizer field
-  createdAt: { type: Date, default: Date.now }
+  organizerEmail: { type: String, required: true, index: true },
+  createdAt: { type: Date, default: Date.now },
+  rsvpDeadline: { type: Date, default: Date.now },
+  photos: [{ type: String }], // array of base64 encoded strings
+  messagingUrl: { type: String }, // messaging URL
 });
 
 // Adding index for faster query on organizerEmail

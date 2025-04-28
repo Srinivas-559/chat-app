@@ -9,6 +9,7 @@ const userRoutes = require('./routes/userRoutes');
 const messageRoutes = require('./routes/messageRoutes');
 const invitationRoutes = require('./routes/invitationRoutes');
 const eventRoutes = require('./routes/eventRoutes');
+const classfiedRoutes = require('./routes/classifiedRoutes');
 
 // Socket handlers
 const authSocket = require('./sockets/authSocket');
@@ -35,6 +36,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/invitations', invitationRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/classifieds' , classfiedRoutes)
 app.set('io', io);
 
 // Socket connection handler
