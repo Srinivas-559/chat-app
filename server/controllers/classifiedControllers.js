@@ -2,6 +2,7 @@ const Classified = require('../models/Classified');
 
 // Create Classified
 exports.createClassified = async (req, res) => {
+    console.log("called create classified")
     try {
         const { title, description, category, price, postedBy, photos = [], expiryDate, isAd = false } = req.body;
 
@@ -31,6 +32,7 @@ exports.createClassified = async (req, res) => {
 
 // Get Classifieds (with filter and search)
 exports.getClassifieds = async (req, res) => {
+    console.log("called get classified")
     try {
         const { category, search, page = 1, limit = 10 } = req.query;
         const query = {};
@@ -68,6 +70,7 @@ exports.getClassifieds = async (req, res) => {
 
 // View Single Classified
 exports.getClassifiedById = async (req, res) => {
+    console.log("called get  classified by id ")
     try {
         const { id } = req.params;
 
@@ -85,6 +88,7 @@ exports.getClassifiedById = async (req, res) => {
 };
 // Get classifieds posted by a specific user
 exports.getClassifiedsByUser = async (req, res) => {
+    console.log("called get classified by user ")
     try {
         const { email } = req.params;
         const { page = 1, limit = 10 } = req.query;

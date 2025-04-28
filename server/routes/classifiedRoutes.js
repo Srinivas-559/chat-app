@@ -9,7 +9,7 @@ router.post('/', classifiedController.createClassified);
 router.get('/', classifiedController.getClassifieds);
 
 // Get single classified by ID
-router.get('/:id', classifiedController.getClassifiedById);
+router.get('classified/:id', classifiedController.getClassifiedById);
 
 // 👉 Get classifieds posted by a specific user
 router.get('/user/:email', classifiedController.getClassifiedsByUser);
